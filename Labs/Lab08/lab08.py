@@ -6,6 +6,7 @@ Created on Sat Aug 17 16:27:06 2024
 """
 
 import numpy
+import numpy as np
 import scipy.special
 import sklearn.datasets
 
@@ -36,82 +37,200 @@ def load_iris_binary():
     L[L==2] = 0 # We assign label 0 to virginica (was label 2)
     return D, L
 
-# Optimize the logistic regression loss
-def trainLogRegBinary(DTR, LTR, l):
 
-    ZTR = LTR * 2.0 - 1.0 # We do it outside the objective function, since we only need to do it once
 
-    def logreg_obj_with_grad(v): # We compute both the objective and its gradient to speed up the optimization
-        w = v[:-1]
-        b = v[-1]
-        s = numpy.dot(vcol(w).T, DTR).ravel() + b
 
-        loss = numpy.logaddexp(0, -ZTR * s)
+#################################################################
 
-        G = -ZTR / (1.0 + numpy.exp(ZTR * s))
-        GW = (vrow(G) * DTR).mean(1) + l * w.ravel()
-        Gb = G.mean()
-        return loss.mean() + l / 2 * numpy.linalg.norm(w)**2, numpy.hstack([GW, numpy.array(Gb)])
+#Step 1 suggestion using the explicit gradient value
+def f_with_grad(x):
+    y, z = x[0], x[1]
+    value = (y + 3)**2 + np.sin(y) + (z + 1)**2
+    grad_y = 2 * (y + 3) + np.cos(y)
+    grad_z = 2 * (z + 1)
+    gradient = np.array([grad_y, grad_z])
+    return value, gradient
 
-    vf = scipy.optimize.fmin_l_bfgs_b(logreg_obj_with_grad, x0 = numpy.zeros(DTR.shape[0]+1))[0]
-    print ("Log-reg - lambda = %e - J*(w, b) = %e" % (l, logreg_obj_with_grad(vf)[0]))
-    return vf[:-1], vf[-1]
+#Step 2 using the apprximate gradient
+def f_obj(x):
+    y, z = x[0], x[1]
+    return (y + 3)**2 + np.sin(y) + (z + 1)**2
 
-# Optimize the weighted logistic regression loss
-def trainWeightedLogRegBinary(DTR, LTR, l, pT):
+def train_logreg(DTR, LTR, l):
+    Z = 2 * LTR - 1  # Convert labels to -1, +1
+    n = DTR.shape[1]
+    d = DTR.shape[0]
 
-    ZTR = LTR * 2.0 - 1.0 # We do it outside the objective function, since we only need to do it once
+    def logreg_obj(v):
+        w, b = v[0:-1], v[-1]
+        S = (np.dot(w.T, DTR) + b).ravel()
+        loss = np.logaddexp(0, -Z * S).mean()
+        reg = 0.5 * l * np.dot(w, w)
+        J = reg + loss
+
+        # Gradient computation
+        G = -Z / (1.0 + np.exp(Z * S))
+        grad_w = l * w + (np.dot(DTR, G.T) / n)
+        grad_b = np.sum(G) / n
+        gradient = np.hstack([grad_w, grad_b])
+        return J, gradient
+
+    x0 = np.zeros(d + 1)
+    result = scipy.optimize.fmin_l_bfgs_b(
+        func=logreg_obj,
+        x0=x0,
+        approx_grad=False
+    )
+    return result[0][:-1], result[0][-1]  # w, b
+
+# STEP 4: Evaluation
+def compute_accuracy(D, L, w, b):
+    S = 1 / (1 + np.exp(-(np.dot(w.T, D) + b)))
+    P = (S > 0.5).astype(int)
+    acc = (P == L).mean()
+    return acc
+
+def log_likelihood(LTR):
+    pi_emp = (LTR == 1).mean()
+    log_odds = np.log(pi_emp / (1 - pi_emp))
+    S_llr = S - log_odds
     
-    wTrue = pT / (ZTR>0).sum() # Compute the weights for the two classes
-    wFalse = (1-pT) / (ZTR<0).sum()
+#cfn is false negative and cfp is false positive
+def optimal_bayes_decision(LLR, prior, cfn, cfp):
+    threshold = -np.log((prior * cfn) / ((1-prior) * cfp))
+    return np.int32(LLR > threshold) 
+    
+def compute_confusion_matrix(L_pred, L_true, num_classes):
+    CM = np.zeros((num_classes, num_classes), dtype=np.int32)
+    for true_label, pred_label in zip(L_true, L_pred):
+        CM[pred_label, true_label] += 1  # Rows: predicted, Columns: actual
+    return CM
 
-    def logreg_obj_with_grad(v): # We compute both the objective and its gradient to speed up the optimization
-        w = v[:-1]
-        b = v[-1]
-        s = numpy.dot(vcol(w).T, DTR).ravel() + b
+def empirical_bayes_risks(cf, prior, cfn, cpn, normalize=True):
+    pfn = cf[0,1] / (cf[0,1] + cf[1,1])
+    ppn = cf[1,0] / (cf[0,0] + cf[1,0])
+    DCF = prior * cfn * pfn + (1-prior)*cpn*ppn
+    if normalize:
+        return DCF / np.minimum(prior * cfn, (1-prior)*cpn)
+    return DCF
 
-        loss = numpy.logaddexp(0, -ZTR * s)
-        loss[ZTR>0] *= wTrue # Apply the weights to the loss computations
-        loss[ZTR<0] *= wFalse
+def compute_min_DCF(llr, labels, prior, cfn, cpn, dcf_norm):
+    thresholds = np.concatenate([np.array([-np.inf]), llr[np.argsort(llr)], np.array([np.inf])])
+    min_dcf = None
+    dcf_th = None
+    for t in thresholds:
+        predictions = np.int32(llr > t)  # Binary decisions: 1 if LLR > t, else 0
+        cm = compute_confusion_matrix(predictions, labels, 2)
+        dcf = empirical_bayes_risks(cm, prior, cfn, cpn, normalize=True)
+        if min_dcf is None or dcf < min_dcf:
+            min_dcf = dcf
+            dcf_th = t
+    return min_dcf
 
-        G = -ZTR / (1.0 + numpy.exp(ZTR * s))
-        G[ZTR > 0] *= wTrue # Apply the weights to the gradient computations
-        G[ZTR < 0] *= wFalse
-        
-        GW = (vrow(G) * DTR).sum(1) + l * w.ravel()
-        Gb = G.sum()
-        return loss.sum() + l / 2 * numpy.linalg.norm(w)**2, numpy.hstack([GW, numpy.array(Gb)])
+def train_prior_weighted_logreg(DTR, LTR, l, pi_T):
+    Z = 2 * LTR - 1  # ZTR
+    nT = np.sum(LTR == 1)
+    nF = np.sum(LTR == 0)
+    xi = np.where(LTR == 1, pi_T / nT, (1 - pi_T) / nF)
 
-    vf = scipy.optimize.fmin_l_bfgs_b(logreg_obj_with_grad, x0 = numpy.zeros(DTR.shape[0]+1))[0]
-    print ("Weighted Log-reg (pT %e) - lambda = %e - J*(w, b) = %e" % (pT, l, logreg_obj_with_grad(vf)[0]))
-    return vf[:-1], vf[-1]
+    def logreg_obj(v):
+        w, b = v[0:-1], v[-1]
+        S = np.dot(w.T, DTR) + b  # shape (N,)
+        G = -Z / (1.0 + np.exp(Z * S))
+        loss = (l / 2) * np.sum(w ** 2) + np.sum(xi * np.logaddexp(0, -Z * S))
 
-import bayesRisk # Laboratory 7
+        grad_w = l * w + np.dot(DTR, xi * G)
+        grad_b = np.sum(xi * G)
+
+        vgrad = np.hstack([grad_w, grad_b])
+        return loss, vgrad
+
+    x0 = np.zeros(DTR.shape[0] + 1)
+    res, f, d = scipy.optimize.fmin_l_bfgs_b(
+        func=logreg_obj,
+        x0=x0,
+        approx_grad=False
+    )
+    # Compute gradient at the solution
+    return res[0:-1], res[-1], f  # return w, b
+    
 
 if __name__ == '__main__':
     
     D, L = load_iris_binary()
-    (DTR, LTR), (DVAL, LVAL) = split_db_2to1(D, L)
+    (DTR, LTR), (DTE, LTE) = split_db_2to1(D, L)
     
-    for lamb in [1e-3, 1e-1, 1.0]:
-        w, b = trainLogRegBinary(DTR, LTR, lamb) # Train model
-        sVal = numpy.dot(w.T, DVAL) + b # Compute validation scores
-        PVAL = (sVal > 0) * 1 # Predict validation labels - sVal > 0 returns a boolean array, multiplying by 1 (integer) we get an integer array with 0's and 1's corresponding to the original True and False values
-        err = (PVAL != LVAL).sum() / float(LVAL.size)
-        print ('Error rate: %.1f' % (err*100))
-        # Compute empirical prior
-        pEmp = (LTR == 1).sum() / LTR.size
-        # Compute LLR-like scores
-        sValLLR = sVal - numpy.log(pEmp / (1-pEmp))
-        # Compute optimal decisions for the three priors 0.1, 0.5, 0.9
-        print ('minDCF - pT = 0.5: %.4f' % bayesRisk.compute_minDCF_binary_fast(sValLLR, LVAL, 0.5, 1.0, 1.0))
-        print ('actDCF - pT = 0.5: %.4f' % bayesRisk.compute_actDCF_binary_fast(sValLLR, LVAL, 0.5, 1.0, 1.0))
+    #Step 1 Explicit evaluation
+    x0 = np.array([0.0, 0.0])
+    x_min, f_min, info = scipy.optimize.fmin_l_bfgs_b(f_with_grad, x0)
 
-        pT = 0.8
-        w, b = trainWeightedLogRegBinary(DTR, LTR, lamb, pT = pT) # Train model to print the loss
-        sVal = numpy.dot(w.T, DVAL) + b
-        sValLLR = sVal - numpy.log(pT / (1-pT))
-        print ('minDCF - pT = 0.8: %.4f' % bayesRisk.compute_minDCF_binary_fast(sValLLR, LVAL, pT, 1.0, 1.0))
-        print ('actDCF - pT = 0.8: %.4f' % bayesRisk.compute_actDCF_binary_fast(sValLLR, LVAL, pT, 1.0, 1.0))
+    print("Minimum x:", x_min)
+    print("Minimum value f(x):", f_min)
+    print("Extra info:", info)
+    
+    x_min2, f_min2, info2 = scipy.optimize.fmin_l_bfgs_b(f_obj, x0, approx_grad = True)
+    print("Minimum x:", x_min2)
+    print("Minimum value f(x):", f_min2)
+    print("Extra info:", info2)
+    
+    
+    #Binary logistic regression
+    for lambda_val in [1e-3, 0.1, 1]:
+        print('Lamda: ', lambda_val)
+        w, b = train_logreg(DTR, LTR, lambda_val)
+        acc = compute_accuracy(DTE, LTE, w, b)
+        print("Validation Accuracy:", acc)
         
-        print ()
+        #score
+        S = (w.T @ DTE + b).ravel()
+        #error rate
+        LP = (S > 0).astype(int)
+        accuracy = (LP == LTE).mean()
+        error_rate = 1 - accuracy
+        print(f"The error rate is: {error_rate * 100:.2f}%")
+    
+        pi_emp = (LTR == 1).mean()
+        log_odds = np.log(pi_emp / (1 - pi_emp))
+        S_llr = S - log_odds
+        
+        prior = 0.5
+        cfn = 1
+        cpn = 1
+    
+        decisions = optimal_bayes_decision(S_llr ,prior , cfn, cpn)
+
+        cm = compute_confusion_matrix(decisions, LTE, LTE.max()+1)
+        # print(cm)
+
+        dcf_norm = empirical_bayes_risks(cm, prior, cfn, cpn, normalize=True)
+        print(f"Actual DCF : {dcf_norm}\n")
+        
+        #Minimum Detection Cost
+        min_cost = compute_min_DCF(S_llr, LTE, prior, cfn, cpn, dcf_norm)
+        print(f"min DCF: {min_cost}\n") 
+    
+
+
+    #Prior-weighted logistic regression ans calabration
+    for lambda_val in [1e-3, 0.1, 1]:
+        print('Lamda: ', lambda_val)
+        pi_T = 0.8
+        w, b, grad = train_prior_weighted_logreg(DTR, LTR, lambda_val, pi_T)
+        acc = compute_accuracy(DTE, LTE, w, b)
+        
+        #score
+        S = (w @ DTE + b).ravel()
+        s_llr = S - np.log(pi_T / (1 - pi_T))
+        prior = 0.5
+        cfn = 1
+        cpn = 1
+        print("Gradient at optimal point:", grad)
+        decisions = optimal_bayes_decision(s_llr ,pi_T , cfn, cpn)
+        cm = compute_confusion_matrix(decisions, LTE, LTE.max()+1)
+        # print(cm)
+        dcf_norm = empirical_bayes_risks(cm, pi_T, cfn, cpn, normalize=True)
+        print(f"Actual DCF : {dcf_norm}\n")
+        min_cost = compute_min_DCF(s_llr, LTE, pi_T, cfn, cpn, dcf_norm)
+        print(f"min DCF: {min_cost}\n")
+    
+
