@@ -28,6 +28,7 @@ def compute_mu_C(D):
 def logpdf_GAU_ND(x, mu, C):
     P = np.linalg.inv(C)
     return -0.5*x.shape[0]*np.log(np.pi*2) - 0.5*np.linalg.slogdet(C)[1] - 0.5 * ((x-mu) * (P @ (x-mu))).sum(0)
+
 #loading the iris data using skklearn library
 def load_iris():
     D, L = sklearn.datasets.load_iris()['data'].T, sklearn.datasets.load_iris()['target']
