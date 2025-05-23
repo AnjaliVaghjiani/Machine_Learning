@@ -133,8 +133,20 @@ def evaluate_bnr(DTR, LTR, DTE, LTE, lambdas, labels):
         min_cost = compute_min_DCF(S_llr, LTE, prior, cfn, cpn, dcf_norm)
         actual_dcf_list.append(dcf_norm)
         min_dcf_list.append(min_cost)
+        
+        # Find and print minimum actualDCF and its corresponding lambda
+    min_act_dcf = min(actual_dcf_list)
+    best_lambda_act = lambdas[actual_dcf_list.index(min_act_dcf)]
+    print(f"Minimum Actual DCF: {min_act_dcf:.4f} at λ = {best_lambda_act}")
+
+    # Find and print minimum minDCF and its corresponding lambda
+    min_min_dcf = min(min_dcf_list)
+    best_lambda_min = lambdas[min_dcf_list.index(min_min_dcf)]
+    print(f"Minimum minDCF: {min_min_dcf:.4f} at λ = {best_lambda_min}")
+
     
     plot_bnr(lambdas, actual_dcf_list, min_dcf_list, labels)
+    return S_llr
     
 def plot_bnr(lamdas, actual_dcf, min_dcf, label):
     plt.figure(figsize=(8, 5))
@@ -188,7 +200,40 @@ def quadratic_feature_expansion(D):
         expanded_features.append(np.hstack(phi))
     return np.array(expanded_features).T 
 
-    
+def compute_effective_prior(prior, cfn, cfp):
+    return prior * cfn / (prior * cfn + (1 - prior) * cfp)
+
+def bayes_error_plot(llrs, labels, cfn=1, cfp=1, model_name="Model"):
+    prior_log_odds = np.linspace(-4, 4, 25)
+    DCFs = []
+    minDCFs = []
+
+    for ptilde in prior_log_odds:
+        prior = 1 / (1 + np.exp(-ptilde))
+        eff_prior = compute_effective_prior(prior, cfn, cfp)
+
+        # Actual DCF
+        threshold = -np.log((eff_prior * cfn) / ((1 - eff_prior) * cfp))
+        predictions = (llrs > threshold).astype(int)
+        cm = compute_confusion_matrix(predictions, labels, 2)
+        dcf = empirical_bayes_risks(cm, eff_prior, cfn, cfp, normalize=True)
+        DCFs.append(dcf)
+
+        # Minimum DCF
+        min_dcf = compute_min_DCF(llrs, labels, eff_prior, cfn, cfp, dcf)
+        minDCFs.append(min_dcf)
+
+    plt.plot(prior_log_odds, DCFs, label=f"{model_name} - DCF", color="r")
+    plt.plot(prior_log_odds, minDCFs, label=f"{model_name} - minDCF", color="b")
+    plt.xlabel("Prior Log-Odds")
+    plt.ylabel("DCF")
+    plt.ylim([0, 1.1])
+    plt.title(f"Bayes Error Plot - {model_name}")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+  
 if __name__ == '__main__':
     
     file_path = 'Traindata.txt'  # Replace with your actual file path
@@ -196,45 +241,49 @@ if __name__ == '__main__':
     (DTR, LTR), (DTE, LTE) = split_db_2to1(D, L)
     lambdas = numpy.logspace(-4, 2, 13)
     labels = "Binary Logistic Regression model"
-    evaluate_bnr(DTR, LTR, DTE, LTE, lambdas, labels)
+    # evaluate_bnr(DTR, LTR, DTE, LTE, lambdas, labels)
     
-    #results with fewwer training set
-    DTR_sub = DTR[:, ::50]
-    LTR_sub = LTR[::50]
-    labels = "fewer samples"
-    evaluate_bnr(DTR_sub, LTR_sub, DTE, LTE, lambdas, labels)
+    # #results with fewwer training set
+    # DTR_sub = DTR[:, ::50]
+    # LTR_sub = LTR[::50]
+    # labels = "fewer samples"
+    # evaluate_bnr(DTR_sub, LTR_sub, DTE, LTE, lambdas, labels)
     
-    #prior weighted version
-    actual_dcf_list = []
-    min_dcf_list = []
-    objectives = []
+    # #prior weighted version
+    # actual_dcf_list = []
+    # min_dcf_list = []
+    # objectives = []
 
-    for lambda_val in lambdas:
-        pi_T = 0.1
-        w, b, grad = train_prior_weighted_logreg(DTR, LTR, lambda_val, pi_T)
-        acc = compute_accuracy(DTE, LTE, w, b)
-        objectives.append(grad)
+    # for lambda_val in lambdas:
+    #     pi_T = 0.1
+    #     w, b, grad = train_prior_weighted_logreg(DTR, LTR, lambda_val, pi_T)
+    #     acc = compute_accuracy(DTE, LTE, w, b)
+    #     objectives.append(grad)
         
-        #score
-        S = (w @ DTE + b).ravel()
-        s_llr = S - np.log(pi_T / (1 - pi_T))
-        prior = 0.1
-        cfn = 1
-        cpn = 1
-        decisions = optimal_bayes_decision(s_llr ,pi_T , cfn, cpn)
-        cm = compute_confusion_matrix(decisions, LTE, LTE.max()+1)
-        # print(cm)
-        dcf_norm = empirical_bayes_risks(cm, pi_T, cfn, cpn, normalize=True)
-        min_cost = compute_min_DCF(s_llr, LTE, pi_T, cfn, cpn, dcf_norm)
-        actual_dcf_list.append(dcf_norm)
-        min_dcf_list.append(min_cost)
-    labels = "prior-weighted"
-    plot_bnr(lambdas, actual_dcf_list, min_dcf_list, labels)
+    #     #score
+    #     S = (w @ DTE + b).ravel()
+    #     s_llr = S - np.log(pi_T / (1 - pi_T))
+    #     prior = 0.1
+    #     cfn = 1
+    #     cpn = 1
+    #     decisions = optimal_bayes_decision(s_llr ,pi_T , cfn, cpn)
+    #     cm = compute_confusion_matrix(decisions, LTE, LTE.max()+1)
+    #     # print(cm)
+    #     dcf_norm = empirical_bayes_risks(cm, pi_T, cfn, cpn, normalize=True)
+    #     min_cost = compute_min_DCF(s_llr, LTE, pi_T, cfn, cpn, dcf_norm)
+    #     actual_dcf_list.append(dcf_norm)
+    #     min_dcf_list.append(min_cost)
+    # labels = "prior-weighted"
+    # plot_bnr(lambdas, actual_dcf_list, min_dcf_list, labels)
     
     #Quadratic logistic regression model
     DTR_quad = quadratic_feature_expansion(DTR)
     DTE_quad = quadratic_feature_expansion(DTE)
     labels = "quadratic logistic regression"
-    evaluate_bnr(DTR_quad, LTR, DTE_quad, LTE, lambdas, labels)
+    S_llr_quad = evaluate_bnr(DTR_quad, LTR, DTE_quad, LTE, lambdas, labels)
+    
+    #bayes plot for lab12 2025
+    bayes_error_plot(S_llr_quad, LTE, model_name="Bayes Error Plot (Quadratic Logistic Regression)")
+    
     
   

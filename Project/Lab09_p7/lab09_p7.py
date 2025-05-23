@@ -232,7 +232,7 @@ def compute_dual_svm(DTR, LTR, C, K=1.0, factr=np.nan, pgtol=1e-5, maxiter=15000
 
     return w_star, b_star, alpha_opt, J_primal, J_dual, duality_gap
 
-def plot_dcf_vs_C(C_values, minDCF_values, actDCF_values, pi_T=0.1):
+def plot_dcf_vs_C(C_values, minDCF_values, actDCF_values, pi_T=0.1, label = 'non-centered'):
     plt.figure(figsize=(8, 6))
     plt.plot(C_values, minDCF_values, label='minDCF', marker='o')
     plt.plot(C_values, actDCF_values, label='actDCF', marker='x')
@@ -240,7 +240,7 @@ def plot_dcf_vs_C(C_values, minDCF_values, actDCF_values, pi_T=0.1):
     plt.xscale('log')
     plt.xlabel('C (log scale)')
     plt.ylabel(f'DCF (πT = {pi_T})')
-    plt.title('SVM: minDCF vs actDCF vs C')
+    plt.title(f'SVM: minDCF vs actDCF vs C {label}')
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.legend()
     plt.tight_layout()
@@ -352,6 +352,35 @@ def plot_rbf_gridsearch_results(C_values, gamma_values, minDCF_results, actDCF_r
 
     plt.tight_layout()
     plt.show()
+    
+def bayes_error_plot(S_llr, LTE, title="Bayes Error Plot"):
+    log_odds_range = np.linspace(-4, 4, 25)
+    effective_priors = 1 / (1 + np.exp(-log_odds_range))
+
+    actual_dcf_list = []
+    min_dcf_list = []
+
+    cfn = 1
+    cpn = 1
+
+    for pi in effective_priors:
+        decisions = optimal_bayes_decision(S_llr, pi, cfn, cpn)
+        cm = compute_confusion_matrix(decisions, LTE, 2)
+        dcf = empirical_bayes_risks(cm, pi, cfn, cpn, normalize=True)
+        min_dcf = compute_min_DCF(S_llr, LTE, pi, cfn, cpn, dcf)
+        actual_dcf_list.append(dcf)
+        min_dcf_list.append(min_dcf)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(log_odds_range, actual_dcf_list, label='Actual DCF', marker='o')
+    plt.plot(log_odds_range, min_dcf_list, label='Min DCF', marker='x')
+    plt.xlabel("logit(πT)")
+    plt.ylabel("DCF")
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
     
 if __name__ == '__main__':
@@ -411,13 +440,58 @@ if __name__ == '__main__':
         
     # plot_dcf_vs_C(C_values, min_dcf_values, act_DCF_values)
     
-    #polynomial kernel
-    min_dcf_pol = []
-    act_dcf_pol = []
+    #with centered data
+    # mu = DTR.mean(axis=1, keepdims=True)
+    # DTR_centered = DTR - mu
+    # DTE_centered = DTE - mu
     
-    configs = [
-        (0.0, 'poly', {'c': 1, 'd': 2}),
-    ]
+    # C_values = np.logspace(-5, 0, 11)
+    # K = 1
+    # min_dcf_values = []
+    # act_DCF_values = []
+    
+    # for c in C_values:
+    #     w, b, alpha, Jp, Jd, gap = compute_dual_svm(DTR_centered, LTR, c, K)
+
+    #     print("Primal J(w*, b*):", Jp)
+    #     print("Dual Jd(α*):", Jd)
+
+    #     # Evaluate on centered test data
+    #     scores = w.T @ DTE_centered + b
+    #     predictions = (scores > 0).astype(int)
+    #     accuracy = (predictions == LTE).mean()
+    #     print(f"Error: {(1 - accuracy) * 100:.2f}%")
+
+    #     pi_emp = (LTR == 1).mean()
+    #     log_odds = np.log(pi_emp / (1 - pi_emp))
+    #     S_llr = scores - log_odds
+
+    #     prior = 0.1
+    #     cfn = 1
+    #     cpn = 1
+
+    #     decisions = optimal_bayes_decision(S_llr, prior, cfn, cpn)
+    #     cm = compute_confusion_matrix(decisions, LTE, LTE.max() + 1)
+
+    #     dcf_norm = empirical_bayes_risks(cm, prior, cfn, cpn, normalize=True)
+    #     act_DCF_values.append(dcf_norm)
+    #     print(f"Actual DCF : {dcf_norm}")
+
+    #     min_cost = compute_min_DCF(S_llr, LTE, prior, cfn, cpn, dcf_norm)
+    #     min_dcf_values.append(min_cost)
+    #     print(f"min DCF: {min_cost}")
+    #     print()
+
+    # label = 'centerd data'
+    # plot_dcf_vs_C(C_values, min_dcf_values, act_DCF_values, label = label)
+    
+    #polynomial kernel
+    # min_dcf_pol = []
+    # act_dcf_pol = []
+    
+    # configs = [
+    #     (0.0, 'poly', {'c': 1, 'd': 2}),
+    # ]
     # for C in C_values:
     #     print(f"C: {C}")
     #     for K, kernel_type, params in configs:
@@ -457,21 +531,27 @@ if __name__ == '__main__':
     #         print(f"Error rate: {(1-acc)*100:.2f}")
             
     #         dcf_norm = empirical_bayes_risks(cm, prior, cfn, cpn, normalize=True)
-    #         # act_dcf_pol.append(dcf_norm)
+    #         act_dcf_pol.append(dcf_norm)
     #         print(f"Actual DCF : {dcf_norm}")
             
     #         #Minimum Detection Cost
     #         min_cost = compute_min_DCF(S_llr, LTE, prior, cfn, cpn, dcf_norm)
-    #         # min_dcf_pol.append(min_cost)
+    #         min_dcf_pol.append(min_cost)
     #         print(f"min DCF: {min_cost}")
     #         print()
             
+    # label = 'polynomial kernel'
+    # plot_dcf_vs_C(C_values, min_dcf_pol, act_dcf_pol, label = label)
             
     #RBF kernel
-    gamma_values = np.exp(-np.array([4, 3, 2, 1]))
+    min_dcf_pol = []
+    act_dcf_pol = []
+    gamma_values = [1e-4, 1e-3, 1e-2, 1e-1]
+    # gamma_values = np.exp(-np.array([4, 3, 2, 1]))
     C_values = np.logspace(-3, 2, 11)
     
     for gamma in gamma_values:
+        print(f'gamma: {gamma}')
         min_dcf_gamma = []
         act_dcf_gamma = []
         
@@ -516,7 +596,37 @@ if __name__ == '__main__':
         
     plot_rbf_gridsearch_results(C_values, gamma_values, min_dcf_pol, act_dcf_pol)
         
-
+    act_dcf_array = np.array(act_dcf_pol)
+    min_dcf_array = np.array(min_dcf_pol)
+    
+    # Find the index of the minimum Actual DCF
+    min_act_dcf_idx = np.unravel_index(np.argmin(act_dcf_array), act_dcf_array.shape)
+    min_act_dcf_value = act_dcf_array[min_act_dcf_idx]
+    best_gamma_act = gamma_values[min_act_dcf_idx[0]]
+    best_C_act = C_values[min_act_dcf_idx[1]]
+    
+    # Find the index of the minimum MinDCF
+    min_min_dcf_idx = np.unravel_index(np.argmin(min_dcf_array), min_dcf_array.shape)
+    min_min_dcf_value = min_dcf_array[min_min_dcf_idx]
+    best_gamma_min = gamma_values[min_min_dcf_idx[0]]
+    best_C_min = C_values[min_min_dcf_idx[1]]
+    
+    # Print results
+    print(f"Lowest Actual DCF: {min_act_dcf_value:.4f} at γ={best_gamma_act}, C={best_C_act}")
+    print(f"Lowest Min DCF: {min_min_dcf_value:.4f} at γ={best_gamma_min}, C={best_C_min}")
    
+    
+   # Recompute best model scores
+    kernel = kernel_with_bias(rbf_kernel, {'gamma': best_gamma_min}, bias_K=1)
+    
+    alpha_opt, Z, DTR_kernel, H = compute_kernel_svm_dual(DTR, LTR, best_C_min, kernel_func=kernel, kernel_params={})
+    scores = compute_kernel_svm_scores(DTE, alpha_opt, Z, DTR_kernel, kernel_func=kernel, kernel_params={})
+    
+    # Convert scores to log-likelihood ratios
+    pi_emp = (LTR == 1).mean()
+    log_odds = np.log(pi_emp / (1 - pi_emp))
+    S_llr = scores - log_odds
+    bayes_error_plot(S_llr, LTE, title=f"Bayes Error Plot (RBF SVM, C={best_C_min:.2e}, gamma={best_gamma_min})")
+
    
     

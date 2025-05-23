@@ -230,64 +230,64 @@ if __name__ == '__main__':
     #Kernal SVM
     # Assume DTR, LTR, DTE, LTE are available
 
-    configs = [
-        (0.0, 'poly', {'c': 0, 'd': 2}),
-        (1.0, 'poly', {'c': 0, 'd': 2}),
-        (0.0, 'poly', {'c': 1, 'd': 2}),
-        (1.0, 'poly', {'c': 1, 'd': 2}),
-        (0.0, 'rbf', {'gamma': 1.0}),
-        (1.0, 'rbf', {'gamma': 1.0}),
-        (0.0, 'rbf', {'gamma': 10.0}),
-        (1.0, 'rbf', {'gamma': 10.0}),
-    ]
+    # configs = [
+    #     (0.0, 'poly', {'c': 0, 'd': 2}),
+    #     (1.0, 'poly', {'c': 0, 'd': 2}),
+    #     (0.0, 'poly', {'c': 1, 'd': 2}),
+    #     (1.0, 'poly', {'c': 1, 'd': 2}),
+    #     (0.0, 'rbf', {'gamma': 1.0}),
+    #     (1.0, 'rbf', {'gamma': 1.0}),
+    #     (0.0, 'rbf', {'gamma': 10.0}),
+    #     (1.0, 'rbf', {'gamma': 10.0}),
+    # ]
     
-    for K, kernel_type, params in configs:
-        if kernel_type == 'poly':
-            base_kernel = polynomial_kernel
-            kernel_params = {'c': params['c'], 'd': params['d']}
-        elif kernel_type == 'rbf':
-            base_kernel = rbf_kernel
-            kernel_params = {'gamma': params['gamma']}
-        else:
-            raise ValueError("Unknown kernel type")
+    # for K, kernel_type, params in configs:
+    #     if kernel_type == 'poly':
+    #         base_kernel = polynomial_kernel
+    #         kernel_params = {'c': params['c'], 'd': params['d']}
+    #     elif kernel_type == 'rbf':
+    #         base_kernel = rbf_kernel
+    #         kernel_params = {'gamma': params['gamma']}
+    #     else:
+    #         raise ValueError("Unknown kernel type")
     
-        kernel = kernel_with_bias(base_kernel, kernel_params, bias_K=K)
+    #     kernel = kernel_with_bias(base_kernel, kernel_params, bias_K=K)
     
-        # Train
-        alpha_opt, Z, DTR_kernel, H = compute_kernel_svm_dual(DTR, LTR, C=1.0, kernel_func=kernel, kernel_params={})
-        primal_loss, dual_loss, gap = compute_objectives(alpha_opt, H, Z, C=1.0)
-        # Predict
-        scores = compute_kernel_svm_scores(DTE, alpha_opt, Z, DTR_kernel, kernel_func=kernel, kernel_params={})
-        preds = (scores > 0).astype(int)
-        acc = np.mean(preds == LTE)
+    #     # Train
+    #     alpha_opt, Z, DTR_kernel, H = compute_kernel_svm_dual(DTR, LTR, C=1.0, kernel_func=kernel, kernel_params={})
+    #     primal_loss, dual_loss, gap = compute_objectives(alpha_opt, H, Z, C=1.0)
+    #     # Predict
+    #     scores = compute_kernel_svm_scores(DTE, alpha_opt, Z, DTR_kernel, kernel_func=kernel, kernel_params={})
+    #     preds = (scores > 0).astype(int)
+    #     acc = np.mean(preds == LTE)
         
-        pi_emp = (LTR == 1).mean()
-        log_odds = np.log(pi_emp / (1 - pi_emp))
-        S_llr = scores - log_odds
+    #     pi_emp = (LTR == 1).mean()
+    #     log_odds = np.log(pi_emp / (1 - pi_emp))
+    #     S_llr = scores - log_odds
         
-        prior = 0.5
-        cfn = 1
-        cpn = 1
+    #     prior = 0.5
+    #     cfn = 1
+    #     cpn = 1
         
        
-        decisions = optimal_bayes_decision(S_llr ,prior , cfn, cpn)
+    #     decisions = optimal_bayes_decision(S_llr ,prior , cfn, cpn)
 
-        cm = compute_confusion_matrix(decisions, LTE, LTE.max()+1)
-        # print(cm)
-        # Display result
-        kernel_desc = f"Poly(d={params.get('d')}, c={params.get('c')})" if kernel_type == 'poly' else f"RBF(γ={params.get('gamma')})"
-        print(f"K={K}, Kernel={kernel_desc} → Error Rate: {(1-acc) * 100:.2f}%")
-        print(f"Primla loss: {primal_loss}")
-        print(f"Dual loss:{dual_loss}")
+    #     cm = compute_confusion_matrix(decisions, LTE, LTE.max()+1)
+    #     # print(cm)
+    #     # Display result
+    #     kernel_desc = f"Poly(d={params.get('d')}, c={params.get('c')})" if kernel_type == 'poly' else f"RBF(γ={params.get('gamma')})"
+    #     print(f"K={K}, Kernel={kernel_desc} → Error Rate: {(1-acc) * 100:.2f}%")
+    #     print(f"Primla loss: {primal_loss}")
+    #     print(f"Dual loss:{dual_loss}")
        
         
-        dcf_norm = empirical_bayes_risks(cm, prior, cfn, cpn, normalize=True)
-        print(f"Actual DCF : {dcf_norm}")
+    #     dcf_norm = empirical_bayes_risks(cm, prior, cfn, cpn, normalize=True)
+    #     print(f"Actual DCF : {dcf_norm}")
         
-        #Minimum Detection Cost
-        min_cost = compute_min_DCF(S_llr, LTE, prior, cfn, cpn, dcf_norm)
-        print(f"min DCF: {min_cost}")
-        print()
+    #     #Minimum Detection Cost
+    #     min_cost = compute_min_DCF(S_llr, LTE, prior, cfn, cpn, dcf_norm)
+    #     print(f"min DCF: {min_cost}")
+    #     print()
             
         
             

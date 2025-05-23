@@ -645,6 +645,37 @@ def train_logreg(DTR, LTR, l):
     )
     return result[0][:-1], result[0][-1]  # w, b
 
+
+def bayes_error_plot(S_llr, LTE, title="Bayes Error Plot"):
+    log_odds_range = np.linspace(-4, 4, 25)
+    effective_priors = 1 / (1 + np.exp(-log_odds_range))
+
+    actual_dcf_list = []
+    min_dcf_list = []
+
+    cfn = 1
+    cpn = 1
+
+    for pi in effective_priors:
+        decisions = optimal_bayes_decision(S_llr, pi, cfn, cpn)
+        cm = compute_confusion_matrix(decisions, LTE, 2)
+        dcf = empirical_bayes_risks(cm, pi, cfn, cpn, normalize=True)
+        min_dcf = compute_min_DCF(S_llr, LTE, pi, cfn, cpn, dcf)
+        actual_dcf_list.append(dcf)
+        min_dcf_list.append(min_dcf)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(log_odds_range, actual_dcf_list, label='Actual DCF', marker='o')
+    plt.plot(log_odds_range, min_dcf_list, label='Min DCF', marker='x')
+    plt.xlabel("logit(πT)")
+    plt.ylabel("DCF")
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     D, L = load_project_data('trainData.txt')
     (DTR, LTR), (DTE, LTE) = split_db_2to1(D, L)
@@ -658,53 +689,73 @@ if __name__ == "__main__":
     
     results = {}
     
-    for cov_type in cov_types:
-        print(f"\nCovariance type: {cov_type.upper()}")
-        results[cov_type] = {}
+    # for cov_type in cov_types:
+    #     print(f"\nCovariance type: {cov_type.upper()}")
+    #     results[cov_type] = {}
         
-        for num_components_0 in num_components_list:
-            for num_components_1 in num_components_list:
-                model_key = f"{num_components_0}_{num_components_1}"
-                print(f"Components class 0: {num_components_0}, class 1: {num_components_1}")
+    #     for num_components_0 in num_components_list:
+    #         for num_components_1 in num_components_list:
+    #             model_key = f"{num_components_0}_{num_components_1}"
+    #             print(f"Components class 0: {num_components_0}, class 1: {num_components_1}")
                 
-                # Train GMM for each class with different number of components
-                gmm_class_0 = train_gmms_per_class(DTR[:, LTR==0], num_components_0, cov_type=cov_type, psi=psi)
-                gmm_class_1 = train_gmms_per_class(DTR[:, LTR==1], num_components_1, cov_type=cov_type, psi=psi)
+    #             # Train GMM for each class with different number of components
+    #             gmm_class_0 = train_gmms_per_class(DTR[:, LTR==0], num_components_0, cov_type=cov_type, psi=psi)
+    #             gmm_class_1 = train_gmms_per_class(DTR[:, LTR==1], num_components_1, cov_type=cov_type, psi=psi)
                 
-                # Compute log-likelihoods on test set
-                ll_class_0 = logpdf_GMM(DTE, gmm_class_0)
-                ll_class_1 = logpdf_GMM(DTE, gmm_class_1)
+    #             # Compute log-likelihoods on test set
+    #             ll_class_0 = logpdf_GMM(DTE, gmm_class_0)
+    #             ll_class_1 = logpdf_GMM(DTE, gmm_class_1)
                 
-                # Log-likelihood ratio
-                llr = ll_class_1 - ll_class_0
+    #             # Log-likelihood ratio
+    #             llr = ll_class_1 - ll_class_0
                 
-                # Compute optimal Bayes decisions using given prior
-                decisions = optimal_bayes_decision(llr, prior, 1, 1)
+    #             # Compute optimal Bayes decisions using given prior
+    #             decisions = optimal_bayes_decision(llr, prior, 1, 1)
                 
-                # Compute confusion matrix and performance metrics
-                cm = compute_confusion_matrix(decisions.astype(int), LTE, 2)
-                dcf_norm = empirical_bayes_risks(cm, prior, 1, 1, normalize=True)
-                min_dcf = compute_min_DCF(llr, LTE, prior, 1, 1)
+    #             # Compute confusion matrix and performance metrics
+    #             cm = compute_confusion_matrix(decisions.astype(int), LTE, 2)
+    #             dcf_norm = empirical_bayes_risks(cm, prior, 1, 1, normalize=True)
+    #             min_dcf = compute_min_DCF(llr, LTE, prior, 1, 1)
                 
-                results[cov_type][model_key] = {
-                    'components': (num_components_0, num_components_1),
-                    'actual_dcf': dcf_norm,
-                    'min_dcf': min_dcf
-                }
+    #             results[cov_type][model_key] = {
+    #                 'components': (num_components_0, num_components_1),
+    #                 'actual_dcf': dcf_norm,
+    #                 'min_dcf': min_dcf
+    #             }
                 
-                print(f"Actual DCF: {dcf_norm:.4f}, min DCF: {min_dcf:.4f}\n")
+    #             print(f"Actual DCF: {dcf_norm:.4f}, min DCF: {min_dcf:.4f}\n")
     
-    # Print best results for each covariance type
-    print("\n===== SUMMARY OF RESULTS =====")
-    for cov_type in cov_types:
-        best_model = min(results[cov_type].items(), key=lambda x: x[1]['min_dcf'])
-        comp_0, comp_1 = best_model[1]['components']
-        min_dcf = best_model[1]['min_dcf']
+    # # Print best results for each covariance type
+    # print("\n===== SUMMARY OF RESULTS =====")
+    # for cov_type in cov_types:
+    #     best_model = min(results[cov_type].items(), key=lambda x: x[1]['min_dcf'])
+    #     comp_0, comp_1 = best_model[1]['components']
+    #     min_dcf = best_model[1]['min_dcf']
         
-        print(f"\nBest {cov_type.upper()} covariance model:")
-        print(f"Components for class 0: {comp_0}, Components for class 1: {comp_1}")
-        print(f"Minimum DCF: {min_dcf:.4f}")
+    #     print(f"\nBest {cov_type.upper()} covariance model:")
+    #     print(f"Components for class 0: {comp_0}, Components for class 1: {comp_1}")
+    #     print(f"Minimum DCF: {min_dcf:.4f}")
     
+    
+    #bayes plot for best model found
+    # Choose GMM model configuration
+    cov_type = 'diag'
+    num_components_0 = 16
+    num_components_1 = 32
+    psi = 0.01
+    
+    # Train GMMs
+    gmm_class_0 = train_gmms_per_class(DTR[:, LTR==0], num_components_0, cov_type=cov_type, psi=psi)
+    gmm_class_1 = train_gmms_per_class(DTR[:, LTR==1], num_components_1, cov_type=cov_type, psi=psi)
+    
+    # Compute LLRs on test set
+    ll_class_0 = logpdf_GMM(DTE, gmm_class_0)
+    ll_class_1 = logpdf_GMM(DTE, gmm_class_1)
+    llr = ll_class_1 - ll_class_0
+    
+    # Plot Bayes Error Plot
+    bayes_error_plot(llr, LTE, title=f"Bayes Error Plot (GMM {cov_type.upper()}, ({num_components_0},{num_components_1}))")
+
     # # GMM Parameters
     # num_components_class0 = 8
     # num_components_class1 = 16
