@@ -25,6 +25,7 @@ def compute_confusion_matrix(L_pred, L_true, num_classes):
 def empirical_bayes_risks(cf, prior, cfn, cpn, normalize=True):
     pfn = cf[0,1] / (cf[0,1] + cf[1,1])
     ppn = cf[1,0] / (cf[0,0] + cf[1,0])
+
     DCF = prior * cfn * pfn + (1-prior)*cpn*ppn
     if normalize:
         return DCF / np.minimum(prior * cfn, (1-prior)*cpn)
@@ -139,6 +140,27 @@ def train_prior_weighted_logreg(DTR, LTR, l, pi_T):
     )
     # Compute gradient at the solution
     return res[0:-1], res[-1], f  # return w, b
+
+
+# def plot_fusion_bayes_plot(score1, score2, labels, title= 'Bayes plot'):
+#     effective_priors = np.linspace(-3, 3, 21)
+#     effPriors = 1.0 / (1.0 + np.exp(-effective_priors))
+#     min_dcf = []
+#     act_dcf = []
+    
+#     for pi in effPriors:
+#         dcf1, mindcf1 = evaluate_DCF(score, labels, pi)
+#         min_dcf.append(mindcf1)
+#         act_dcf.append(dcf1)
+    
+#     plt.figure()
+#     plt.plot(effective_priors, min_dcf, label='minDCF', linestyle='--')
+#     plt.plot(effective_priors, act_dcf, label='actDCF')
+#     plt.xlabel('Prior log-odd')
+#     plt.ylabel('DCF')
+#     plt.title(title)
+#     plt.legend()
+#     plt.show()
     
 if __name__ == '__main__':
     
@@ -182,14 +204,17 @@ if __name__ == '__main__':
     # print('Calibrated training')
     # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
     # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
+    
+    # bayes_error_plot(SVAL1 , calibrated_SVAL1, LVAL, title='System 1 - Single fold approch (Calabration)')
+    # bayes_error_plot(SVAL2 , calibrated_SVAL2, LVAL, title='System 2 - Single fold approch (calabration)')
 
     # bayes_plot(calibrated_SVAL1 ,LVAL, title='System 1 - Single fold approch')
     # bayes_plot(calibrated_SVAL2 ,LVAL, title='System 2 - Single fold approch')
     
-    
-    eval_score1 = np.load('eval_scores_1.npy')
-    eval_score2 = np.load('eval_scores_2.npy')
-    eval_labels = np.load('eval_labels.npy')
+    #Evaluation single fold
+    # eval_score1 = np.load('eval_scores_1.npy')
+    # eval_score2 = np.load('eval_scores_2.npy')
+    # eval_labels = np.load('eval_labels.npy')
     
     # dcf_norm_1, min_cost_1 = evaluate_DCF(eval_score1, eval_labels, prior)
     # dcf_norm_2, min_cost_2 = evaluate_DCF(eval_score2, eval_labels, prior)
@@ -198,25 +223,140 @@ if __name__ == '__main__':
     # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
     # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
 
-    # bayes_plot(eval_score1 ,eval_labels, title='System 1 - Single fold approch')
-    # bayes_plot(eval_score2 ,eval_labels, title='System 2 - Single fold approch')
+    # # bayes_plot(eval_score1 ,eval_labels, title='System 1 - Single fold approch')
+    # # bayes_plot(eval_score2 ,eval_labels, title='System 2 - Single fold approch')
     
-    print('Calibrated evaluation score')
-    w, b, loss = train_prior_weighted_logreg(vrow(eval_score1), eval_labels, 0, prior)
-    calibrated_EVAL1 = (w.T @ vrow(eval_score1) + b - np.log(prior / (1-prior))).ravel()
+    # print('Calibrated evaluation score')
+    # w, b, loss = train_prior_weighted_logreg(vrow(eval_score1), eval_labels, 0, prior)
+    # calibrated_EVAL1 = (w.T @ vrow(eval_score1) + b - np.log(prior / (1-prior))).ravel()
     
-    w, b, loss = train_prior_weighted_logreg(vrow(eval_score2), eval_labels, 0, prior)
-    calibrated_EVAL2 = (w.T @ vrow(eval_score2) + b - np.log(prior / (1-prior))).ravel()
+    # w, b, loss = train_prior_weighted_logreg(vrow(eval_score2), eval_labels, 0, prior)
+    # calibrated_EVAL2 = (w.T @ vrow(eval_score2) + b - np.log(prior / (1-prior))).ravel()
     
-    dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_EVAL1, eval_labels, prior)
-    dcf_norm_2, min_cost_2 = evaluate_DCF(calibrated_EVAL2, eval_labels, prior)
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_EVAL1, eval_labels, prior)
+    # dcf_norm_2, min_cost_2 = evaluate_DCF(calibrated_EVAL2, eval_labels, prior)
     
-    print('Calibrated training')
-    print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
-    print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
+    # print('Calibrated training')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+    # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
 
-    bayes_plot(calibrated_EVAL1 ,eval_labels, title='System 1 - Single fold approch')
-    bayes_plot(calibrated_EVAL2 ,eval_labels, title='System 2 - Single fold approch')
+    # bayes_error_plot(eval_score1 , calibrated_EVAL1, eval_labels, title='System 1 - Single fold approch (Evaluation)')
+    # bayes_error_plot(eval_score2 , calibrated_EVAL2, eval_labels, title='System 2 - Single fold approch (Evaluation)')
+    # bayes_plot(calibrated_EVAL1 ,eval_labels, title='System 1 - Single fold approch')
+    # bayes_plot(calibrated_EVAL2 ,eval_labels, title='System 2 - Single fold approch')
     
+    
+    #k-fold approch
+    # K=5
+    # prior = 0.2
+    # SCAL1 =[]
+    # SCAL2 =[]
+    # LCAL = []
+    # for idx in range(K):
+    #   S1 = score_1[idx::K]
+    #   S2 = score_2[idx::K]
+    #   L = labels[idx::K]
+    #   SCAL1.append(S1)
+    #   SCAL2.append(S2)
+    #   LCAL.append(L)
+     
+    # SCAL1 = np.hstack(SCAL1)
+    # SCAL2 = np.hstack(SCAL2)
+    # LCAL = np.hstack(LCAL)
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(SCAL1, LCAL, prior)
+    # dcf_norm_2, min_cost_2 = evaluate_DCF(SCAL2, LCAL, prior)
+    
+    # print('Raw score')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+    # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SCAL1), LCAL, 0, prior)
+    # calibrated_CVAL1 = (w.T @ vrow(SCAL1) + b - np.log(prior / (1-prior))).ravel()
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SCAL2), LCAL, 0, prior)
+    # calibrated_CVAL2 = (w.T @ vrow(SCAL2) + b - np.log(prior / (1-prior))).ravel()
+    
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_CVAL1, LCAL, prior)
+    # dcf_norm_2, min_cost_2 = evaluate_DCF(calibrated_CVAL2, LCAL, prior)
+    
+    # print('Calibrated training')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+    # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
+
+    # bayes_error_plot(SCAL1 , calibrated_CVAL1, LCAL, title='System 1 - k fold approch (Validation)')
+    # bayes_error_plot(SCAL2 , calibrated_CVAL2, LCAL, title='System 2 - Single fold approch (Evaluation)')
+    
+
+    eval_score1 = np.load('eval_scores_1.npy')
+    eval_score2 = np.load('eval_scores_2.npy')
+    eval_labels = np.load('eval_labels.npy')
+    
+    # K=5
+    # prior = 0.2
+    # SEAL1 =[]
+    # SEAL2 =[]
+    # LEAL = []
+    # for idx in range(K):
+    #   S1 = eval_score1[idx::K]
+    #   S2 = eval_score2[idx::K]
+    #   L = eval_labels[idx::K]
+    #   SEAL1.append(S1)
+    #   SEAL2.append(S2)
+    #   LEAL.append(L)
+     
+    # SEAL1 = np.hstack(SEAL1)
+    # SEAL2 = np.hstack(SEAL2)
+    # LEAL = np.hstack(LEAL)
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(SEAL1, LEAL, prior)
+    # dcf_norm_2, min_cost_2 = evaluate_DCF(SEAL2, LEAL, prior)
+    
+    # print('Evaluation Raw score')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+    # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SEAL1), LEAL, 0, prior)
+    # calibrated_CVAL1 = (w.T @ vrow(SEAL1) + b - np.log(prior / (1-prior))).ravel()
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SEAL2), LEAL, 0, prior)
+    # calibrated_CVAL2 = (w.T @ vrow(SEAL2) + b - np.log(prior / (1-prior))).ravel()
+    
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_CVAL1, LEAL, prior)
+    # dcf_norm_2, min_cost_2 = evaluate_DCF(calibrated_CVAL2, LEAL, prior)
+    
+    # print('Calibrated training')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+    # print(f'Score 2: min_cost = {min_cost_2} and act_dcf = {dcf_norm_2}')
+
+    # bayes_error_plot(SEAL1 , calibrated_CVAL1, LEAL, title='System 1 - k fold approch (Validation)')
+    # bayes_error_plot(SEAL2 , calibrated_CVAL2, LEAL, title='System 2 - Single fold approch (Evaluation)')
+    
+    #Score-level fusion
+    FS= np.vstack([SVAL1, SVAL2])
+    labels = np.vstack(LVAL)
+    FES= np.vstack([eval_score1, eval_score2])
+
+     
+    # w, b, loss = train_prior_weighted_logreg(vrow(FS), LCAL, 0, prior)
+    # calibrated_SVAL1 = (w.T @ vrow(SVAL1) + b - np.log(prior / (1-prior))).ravel()
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SCAL2), LCAL, 0, prior)
+    # calibrated_SVAL2 = (w.T @ vrow(SVAL2) + b - np.log(prior / (1-prior))).ravel()
+    
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_SVAL1, LVAL, prior)
+    # dcf_norm_2, min_cost_2 = evaluate_DCF(calibrated_SVAL2, LVAL, prior)
+    dcf_norm_1, min_cost_1 = evaluate_DCF(FS, labels, prior)
+    print('fusion single fold')
+    print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+
+        
+    
+    
+    
+    
+       
+
+  
+   
+      
     
     
