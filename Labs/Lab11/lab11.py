@@ -142,25 +142,37 @@ def train_prior_weighted_logreg(DTR, LTR, l, pi_T):
     return res[0:-1], res[-1], f  # return w, b
 
 
-# def plot_fusion_bayes_plot(score1, score2, labels, title= 'Bayes plot'):
-#     effective_priors = np.linspace(-3, 3, 21)
-#     effPriors = 1.0 / (1.0 + np.exp(-effective_priors))
-#     min_dcf = []
-#     act_dcf = []
+def plot_fusion_bayes_plot(score1, score2, score3, labels, l2, title= 'Bayes plot'):
+    effective_priors = np.linspace(-3, 3, 21)
+    effPriors = 1.0 / (1.0 + np.exp(-effective_priors))
+    min_dcf1, min_dcf2, min_dcf3 = [], [], []
+    act_dcf1, act_dcf2, act_dcf3 = [] ,[],[]
     
-#     for pi in effPriors:
-#         dcf1, mindcf1 = evaluate_DCF(score, labels, pi)
-#         min_dcf.append(mindcf1)
-#         act_dcf.append(dcf1)
+    for pi in effPriors:
+        dcf1, mindcf1 = evaluate_DCF(score1, labels, pi)
+        dcf2, mindcf2 = evaluate_DCF(score2, labels, pi)
+        dcf3, mindcf3 = evaluate_DCF(score3, l2, pi)
+        min_dcf1.append(mindcf1)
+        act_dcf1.append(dcf1)
+        min_dcf2.append(mindcf2)
+        act_dcf2.append(dcf2)
+        min_dcf3.append(mindcf3)
+        act_dcf3.append(dcf3)
     
-#     plt.figure()
-#     plt.plot(effective_priors, min_dcf, label='minDCF', linestyle='--')
-#     plt.plot(effective_priors, act_dcf, label='actDCF')
-#     plt.xlabel('Prior log-odd')
-#     plt.ylabel('DCF')
-#     plt.title(title)
-#     plt.legend()
-#     plt.show()
+    plt.figure()
+    plt.plot(effective_priors, min_dcf1, label='S1-minDCF', linestyle='--')
+    plt.plot(effective_priors, act_dcf1, label='S1-actDCF')
+    plt.plot(effective_priors, min_dcf2, label='S2-minDCF', linestyle='--')
+    plt.plot(effective_priors, act_dcf2, label='S2-actDCF')
+    plt.plot(effective_priors, min_dcf3, label='fused-minDCF', linestyle='--')
+    plt.plot(effective_priors, act_dcf3, label='fused-actDCF')
+    plt.xlabel('Prior log-odd')
+    plt.ylabel('Normalized DCF')
+    plt.ylim(0, 0.8)
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
     
 if __name__ == '__main__':
     
@@ -331,24 +343,134 @@ if __name__ == '__main__':
     # bayes_error_plot(SEAL2 , calibrated_CVAL2, LEAL, title='System 2 - Single fold approch (Evaluation)')
     
     #Score-level fusion
-    FS= np.vstack([SVAL1, SVAL2])
-    labels = np.vstack(LVAL)
-    FES= np.vstack([eval_score1, eval_score2])
-
-     
-    # w, b, loss = train_prior_weighted_logreg(vrow(FS), LCAL, 0, prior)
+    
+    # FS= np.vstack([SCAL1, SCAL2])
+    
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SCAL1), LCAL, 0, prior)
     # calibrated_SVAL1 = (w.T @ vrow(SVAL1) + b - np.log(prior / (1-prior))).ravel()
     
     # w, b, loss = train_prior_weighted_logreg(vrow(SCAL2), LCAL, 0, prior)
     # calibrated_SVAL2 = (w.T @ vrow(SVAL2) + b - np.log(prior / (1-prior))).ravel()
+
+
+    # w, b, loss = train_prior_weighted_logreg((FS), LCAL, 0, prior)
+    # calibrated_fused = (w.T @ np.vstack([SVAL1, SVAL2]) + b - np.log(prior / (1-prior))).ravel()
     
-    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_SVAL1, LVAL, prior)
-    # dcf_norm_2, min_cost_2 = evaluate_DCF(calibrated_SVAL2, LVAL, prior)
-    dcf_norm_1, min_cost_1 = evaluate_DCF(FS, labels, prior)
-    print('fusion single fold')
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_fused, LVAL, prior)
+    # print('fusion single fold')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+
+    # plot_fusion_bayes_plot(calibrated_SVAL1, calibrated_SVAL2, calibrated_fused, LVAL, LVAL,title='Bayes Plot (Score fold- score-level fusion') 
+    
+    #single fusion evluation
+    # FES= np.vstack([eval_score1, eval_score2])
+    # w, b, loss = train_prior_weighted_logreg(vrow(eval_score1), eval_labels, 0, prior)
+    # calibrated_EVAL1 = (w.T @ vrow(eval_score1) + b - np.log(prior / (1-prior))).ravel()
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(eval_score2), eval_labels, 0, prior)
+    # calibrated_EVAL2 = (w.T @ vrow(eval_score2) + b - np.log(prior / (1-prior))).ravel()
+
+
+    # w, b, loss = train_prior_weighted_logreg((FES), eval_labels, 0, prior)
+    # calibrated_fused = (w.T @ np.vstack([eval_score1, eval_score2]) + b - np.log(prior / (1-prior))).ravel()
+    
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_fused, eval_labels, prior)
+    # print('fusion single fold')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+
+    # plot_fusion_bayes_plot(calibrated_EVAL1, calibrated_EVAL2, calibrated_fused, eval_labels,eval_labels, title='Bayes Plot (Score fold- score-level fusion') 
+    
+    
+    
+    # #k-fusion (calibration)
+    
+    # K=5
+    # prior = 0.2
+    # SCAL1 =[]
+    # SCAL2 =[]
+    # LCAL = []
+    # fused_scores = []
+    # fused_labels = []
+    # for idx in range(K):
+    #   S1 = score_1[idx::K]
+    #   S2 = score_2[idx::K]
+    #   L = labels[idx::K]
+    #   SCAL = np.vstack([S1, S2])
+    #   SCAL1.append(S1)
+    #   SCAL2.append(S2)
+    #   LCAL.append(L)
+    #   fused_scores.append(SCAL)
+      
+     
+    # SCAL1 = np.hstack(SCAL1)
+    # SCAL2 = np.hstack(SCAL2)
+    # fused_scores = np.hstack(fused_scores)
+    # fused_labels=  np.hstack(LCAL)
+    # LCAL = np.hstack(LCAL)
+    
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SCAL1), LCAL, 0, prior)
+    # calibrated_CVAL1 = (w.T @ vrow(SCAL1) + b - np.log(prior / (1-prior))).ravel()
+    
+    # w, b, loss = train_prior_weighted_logreg(vrow(SCAL2), LCAL, 0, prior)
+    # calibrated_CVAL2 = (w.T @ vrow(SCAL2) + b - np.log(prior / (1-prior))).ravel()
+    
+    # w, b, loss = train_prior_weighted_logreg(fused_scores, fused_labels, 0, prior)
+    # calibrated_CVAL3 = (w.T @ fused_scores + b - np.log(prior / (1-prior))).ravel()
+    
+    # dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_CVAL3, fused_labels, prior)
+    # print('fusion K fold')
+    # print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
+
+    # plot_fusion_bayes_plot(calibrated_CVAL1, calibrated_CVAL2, calibrated_CVAL3, LCAL,fused_labels, title='Bayes Plot (K- score-level fusion') 
+    
+    #k fusion evaluation
+    
+    K=5
+    prior = 0.2
+    SEAL1 =[]
+    SEAL2 =[]
+    LEAL = []
+    fused_scores = []
+    fused_labels = []
+    for idx in range(K):
+      S1 = eval_score1[idx::K]
+      S2 = eval_score2[idx::K]
+      L = eval_labels[idx::K]
+      SCAL = np.vstack([S1, S2])
+      SEAL1.append(S1)
+      SEAL2.append(S2)
+      LEAL.append(L)
+      fused_scores.append(SCAL)
+     
+    SEAL1 = np.hstack(SEAL1)
+    SEAL2 = np.hstack(SEAL2)
+    fused_scores = np.hstack(fused_scores)
+    fused_labels=  np.hstack(LEAL)
+    LEAL = np.hstack(LEAL)
+
+    
+    w, b, loss = train_prior_weighted_logreg(vrow(SEAL1), LEAL, 0, prior)
+    calibrated_CVAL1 = (w.T @ vrow(SEAL1) + b - np.log(prior / (1-prior))).ravel()
+    
+    w, b, loss = train_prior_weighted_logreg(vrow(SEAL2), LEAL, 0, prior)
+    calibrated_CVAL2 = (w.T @ vrow(SEAL2) + b - np.log(prior / (1-prior))).ravel()
+    
+    w, b, loss = train_prior_weighted_logreg(vrow(SEAL2), LEAL, 0, prior)
+    calibrated_CVAL3 = (w.T @ vrow(SEAL2) + b - np.log(prior / (1-prior))).ravel()
+    
+    w, b, loss = train_prior_weighted_logreg(fused_scores, fused_labels, 0, prior)
+    calibrated_CVAL3 = (w.T @ fused_scores + b - np.log(prior / (1-prior))).ravel()
+    
+    dcf_norm_1, min_cost_1 = evaluate_DCF(calibrated_CVAL3, fused_labels, prior)
+    print('fusion K fold evaluation')
     print(f'Score 1: min_cost = {min_cost_1} and act_dcf = {dcf_norm_1}')
 
-        
+    plot_fusion_bayes_plot(calibrated_CVAL1, calibrated_CVAL2, calibrated_CVAL3, LEAL,fused_labels, title='Bayes Plot (K- score-level fusion') 
+    
+
+    
     
     
     
